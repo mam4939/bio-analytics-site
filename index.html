@@ -487,23 +487,54 @@
             userMsg.textContent = 'Вы: ' + q;
             chatBody.appendChild(userMsg);
 
-            let response = 'Извините, запишите конкретный вопрос по здоровью или данных.';
             const lower = q.toLowerCase();
+            let response = '';
 
-            if (lower.includes('дошик') || lower.includes('еда')) {
-                response = 'Если вы съели дошик, в целом это быстрое питание. Возможны тяжесть в желудке; лучше пейте воду и ешьте овощи.';
-            } else if (lower.includes('прив') || lower.includes('привет')) {
-                response = 'Привет! Я могу анализировать данные по патогенам. Например: "показать высокие риски".';
-            } else if (lower.includes('высок') || lower.includes('риск')) {
-                const highCount = rawData.filter(i => i.prob >= 80).length;
-                response = `Найдено ${highCount} записей с высоким риском (>=80%).`;            
-            } else if (lower.includes('кишечник')) {
-                const related = rawData.filter(i => i.target.toLowerCase().includes('кишечник')).slice(0, 5);
-                if (related.length) {
-                    response = 'Записи по кишечнику: ' + related.map(i => `${i.name} (${i.prob}%)`).join('; ');
+            // 1) Обязательно отвечаем на любой запрос
+            // 2) Предпочтение темам здоровья и данным патогенов
+            const healthKeywords = ['здоров', 'болезн', 'симптом', 'анализ', 'патоген', 'вирус', 'бактер', 'паразит', 'иммун', 'риск', 'кишечник', 'печень', 'сердц', 'легк'];
+            const generalKeywords = ['привет', 'hello', 'как дела', 'что ты', 'погода', 'шутка', 'юмор'];
+
+            const containsHealth = healthKeywords.some(k => lower.includes(k));
+            const containsGeneral = generalKeywords.some(k => lower.includes(k));
+
+            if (containsHealth || !containsGeneral) {
+                // Анализ данных
+                const results = rawData.filter(item => {
+                    return item.name.toLowerCase().includes(lower)
+                        || item.target.toLowerCase().includes(lower)
+                        || item.category.toLowerCase().includes(lower)
+                        || item.source.toLowerCase().includes(lower);
+                });
+
+                if (results.length > 0) {
+                    const summary = results.slice(0, 4).map(item => `${item.name} (${item.prob}%, ${item.target})`).join('; ');
+                    response = `Найдено ${results.length} совпадений. Первые примеры: ${summary}. `;
                 } else {
-                    response = 'Записей по кишечнику не найдено.';
+                    response = 'По цепочке ваших слов в данных совпадений нет, но я всё равно дам полезный совет. ';
                 }
+
+                if (lower.includes('риск') || lower.includes('высок')) {
+                    const highCount = rawData.filter(i => i.prob >= 80).length;
+                    response += `Высокий риск обнаружен в ${highCount} записях. Рекомендуется обратить внимание на иммунитет и питание.`;
+                } else if (lower.includes('кишечник') || lower.includes('печень') || lower.includes('легк')) {
+                    response += 'Наблюдайте за состоянием пищеварительной и дыхательной систем: вода, растительная пища, свежий воздух.';
+                } else {
+                    response += 'В общем случае: контроль веса, качественное питание, отдых и медицинская оценка при дискомфорте.';
+                }
+            } else {
+                // Обобщённый ответ при любой теме, но добавляем поддержку здоровья
+                response = 'Да, я понимаю разные темы, но в нашем контексте лучше всего фокусироваться на здоровье. ';
+                if (containsGeneral) {
+                    response += 'Например, чтобы узнать статус, спросите про патоген, риск или пищеварение.';
+                } else {
+                    response += 'Также я могу обработать ваши данные анализа (команда "показать high risk").';
+                }
+            }
+
+            // Дополнительный контент
+            if (rawData.length > 0 && lower.includes('тренд')) {
+                response += ' Тренд по данным: большинство высоких значений сосредоточено в категориях Грибы, Вирусы и Гельминты.';
             }
 
             const botMsg = document.createElement('div');
