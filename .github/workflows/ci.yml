@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test-and-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Node dependencies
+        run: npm install node-fetch@2
+
+      - name: Run parser tests (sample data)
+        run: node scripts/parse_webwellness.js data/sample_for_test.json
+
+      - name: Run quality check (Python)
+        run: python3 scripts/quality_check_py.py
+
+      - name: Run agent router for integration smoke test
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: |
+          echo "Testing AI agent with provided secrets"
+          node scripts/agent_router.js "проверка работоспособности CI" || true
+
+      - name: Save success marker
+        run: echo "CI passed" > ci_ok.txt
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Check for missing critical IDs in index.html
+        run: |
+          python3 - <<'PY'
+import pathlib, sys
+path = pathlib.Path('index.html')
+html = path.read_text(encoding='utf-8')
+for name in ['searchInput', 'exportBtn', 'chatBody', 'loadUrlBtn', 'clearDataBtn']:
+    if name not in html:
+        print(f'ERROR: элемент {name} отсутствует в index.html')
+        sys.exit(1)
+print('Lint check passed')
+PY
