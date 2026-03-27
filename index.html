@@ -510,22 +510,8 @@
             })
             .catch(err => {
                 console.error('Chat API error:', err);
-                const lower = q.toLowerCase();
-                let fallback = 'Извините, сервер недоступен. '; 
-
-                if (lower.includes('риск')) {
-                    const highCount = rawData.filter(i => i.prob >= 80).length;
-                    fallback += `Локальный ответ: ${highCount} записей с высоким риском.`;
-                } else if (lower.includes('кишечник')) {
-                    const related = rawData.filter(i => i.target.toLowerCase().includes('кишечник')).slice(0, 3);
-                    fallback += related.length > 0
-                        ? 'Локальный ответ: ' + related.map(i => `${i.name} ${i.prob}%`).join('; ')
-                        : 'Локальный ответ: по кишечнику данных нет.';
-                } else {
-                    fallback += 'Локальный совет: соблюдайте питьевой режим и здоровое питание.';
-                }
-
-                botMsg.textContent = 'ИИ: ' + fallback;
+                const message = 'ИИ: Сервер недоступен. Пожалуйста, проверьте, что сервер запущен (`npm run start`) и ключи API заданы.';
+                botMsg.textContent = message;
                 document.getElementById('chatInput').value = '';
                 chatBody.scrollTop = chatBody.scrollHeight;
             });
