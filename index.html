@@ -1,1 +1,305 @@
 
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Анализ результатов: Вероятностные отягощения</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Chosen Palette: Slate (neutral/calm), Red (high risk), Yellow (medium risk), Emerald (low risk) -->
+    <!-- Application Structure Plan: 
+         1. Header & Disclaimer: Sets context, warns about the nature of bioresonance data.
+         2. Explanation Section: Answers the user's specific question about what the percentages mean.
+         3. Dashboard (Top Threats): A visual bar chart immediately showing the most critical (highest %) pathogens.
+         4. Interactive Directory: A filterable grid grouping all pathogens by category, sorted by danger. Includes hypotheses on infection sources for each item to answer the user's second main question.
+    -->
+    <!-- Visualization & Content Choices: 
+         - Bar Chart (Chart.js): Goal is to 'Compare' the top threats. Best for showing ranking based on percentages.
+         - Filterable Grid (Vanilla JS + Tailwind): Goal is to 'Organize' and 'Inform'. Allows user to digest a large list without being overwhelmed, categorizing by Pathogen type (Viruses, Fungi, etc.).
+    -->
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. Using text/unicode for icons. -->
+
+    <style>
+        body { font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; color: #334155; }
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            margin-left: auto;
+            margin-right: auto;
+            height: 40vh;
+            max-height: 450px;
+            min-height: 300px;
+        }
+        .tab-btn.active { border-bottom: 2px solid #3b82f6; color: #2563eb; font-weight: 600; }
+        .risk-high { background-color: #fee2e2; color: #991b1b; border-left: 4px solid #ef4444; }
+        .risk-medium { background-color: #fef3c7; color: #92400e; border-left: 4px solid #f59e0b; }
+        .risk-low { background-color: #f0fdf4; color: #166534; border-left: 4px solid #10b981; }
+    </style>
+</head>
+<body class="min-h-screen pb-12">
+
+    <!-- Header -->
+    <header class="bg-white shadow-sm border-b border-slate-200 sticky top-0 z-10">
+        <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800">⚕️ Био-Аналитика</h1>
+                <p class="text-xs text-slate-500">Отчет по вероятностным отягощениям (WebWellness)</p>
+            </div>
+            <div class="text-sm bg-blue-50 text-blue-700 px-3 py-1 rounded-full font-medium border border-blue-200">
+                Записей: <span id="totalCount">0</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto px-4 mt-8 space-y-10">
+
+        <!-- Disclaimer & Explanation -->
+        <section class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+            <h2 class="text-xl font-semibold mb-4 border-b pb-2">Что означают эти данные?</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
+                <div>
+                    <h3 class="font-bold text-slate-700 mb-2">📌 Интерпретация процентов (%)</h3>
+                    <p class="mb-2">В системах биорезонансного тестирования процент означает <b>вероятность совпадения частот</b> патогена с частотами вашего организма, а не степень физического поражения органа.</p>
+                    <ul class="space-y-2 mt-3">
+                        <li class="flex items-center"><span class="w-3 h-3 rounded-full bg-red-500 mr-2"></span> <b>Высокий риск (80-100%):</b> Высокая вероятность активного присутствия патогена. Организм тратит много ресурсов.</li>
+                        <li class="flex items-center"><span class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></span> <b>Средний риск (50-79%):</b> Возможна хроническая стадия, "спящее" носительство или успешное подавление иммунитетом.</li>
+                        <li class="flex items-center"><span class="w-3 h-3 rounded-full bg-green-500 mr-2"></span> <b>Низкий риск (< 50%):</b> Информационный след перенесенной инфекции (в вашем отчете таких почти нет).</li>
+                    </ul>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-lg border border-slate-100">
+                    <h3 class="font-bold text-slate-700 mb-2">⚠️ Важное примечание</h3>
+                    <p class="text-slate-600 mb-2">Данный список <b>не является клиническим диагнозом</b>. Это вероятностные маркеры. Многие из перечисленных микроорганизмов (например, Кандида, Вирус Герпеса) являются частью нормальной условно-патогенной микрофлоры человека и проявляют себя только при снижении иммунитета.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Top Threats Dashboard -->
+        <section class="bg-white rounded-xl shadow-sm p-6 border border-slate-200">
+            <div class="mb-6">
+                <h2 class="text-xl font-semibold">Топ-10 самых вероятных отягощений</h2>
+                <p class="text-sm text-slate-500">Патогены с наивысшим процентом совпадения (самые опасные в данный момент). Отсортированы по убыванию.</p>
+            </div>
+            
+            <div class="chart-container">
+                <canvas id="topThreatsChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Detailed Database & Sources -->
+        <section class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+            <div class="p-6 border-b border-slate-200 bg-slate-50">
+                <h2 class="text-xl font-semibold mb-2">Детальный разбор и источники заражения</h2>
+                <p class="text-sm text-slate-500 mb-4">Выберите категорию, чтобы просмотреть подробную информацию о каждом патогене, его органе-мишени и наиболее вероятных путях попадания в организм.</p>
+                
+                <!-- Filters -->
+                <div class="flex flex-wrap gap-2 border-b border-slate-300" id="categoryTabs">
+                    <!-- Buttons will be generated by JS -->
+                </div>
+            </div>
+
+            <div class="p-6">
+                <div id="pathogenGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Cards will be generated by JS -->
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <script>
+        // Data processing and integration
+        const rawData = [
+            // Простейшие
+            { name: "Dientamoeba fragilis", prob: 65, target: "Толстый кишечник", category: "Простейшие", source: "Загрязненная вода или пища, немытые руки. Часто передается вместе с яйцами остриц." },
+            { name: "Toxoplasma gondii", prob: 56, target: "Подчелюстные л/у", category: "Простейшие", source: "Контакт с зараженными кошками (их фекалиями), употребление плохо прожаренного мяса, немытые овощи." },
+            { name: "Lamblia intestinalis", prob: 63, target: "Желчный пузырь", category: "Простейшие", source: "Употребление сырой воды (даже из родников), немытые фрукты и овощи, грязные руки." },
+            { name: "Trichomonas tenax", prob: 56, target: "Ротовая полость, Миндалины, Нос, ЖКТ", category: "Простейшие", source: "Поцелуи, использование общей посуды, зубных щеток. Активно размножается при плохой гигиене рта." },
+            { name: "Naegleria fowleri", prob: 79, target: "Структуры мозга", category: "Простейшие", source: "Попадание воды в нос при купании в пресных, стоячих, теплых водоемах (озера, пруды)." },
+            // Грибы
+            { name: "Candida famata", prob: 72, target: "Носовые проходы", category: "Грибы", source: "Снижение иммунитета. Часть нормальной флоры, которая разрастается при дисбактериозе или после антибиотиков." },
+            { name: "Аllergen mucor", prob: 87, target: "Легочная ткань", category: "Грибы", source: "Вдыхание спор плесени. Часто обитает в сырых помещениях, на старых обоях, в земле комнатных растений." },
+            { name: "Аllergen Saccharomyces", prob: 65, target: "Конъюнктива глаза; Тонкий кишечник", category: "Грибы", source: "Пищевые продукты (пекарские/пивные дрожжи), разрастание собственной микрофлоры." },
+            { name: "Candida norvogensis", prob: 55, target: "Носовые проходы", category: "Грибы", source: "Активация условно-патогенной флоры на фоне стресса или респираторных инфекций." },
+            { name: "Candida pelliculosa", prob: 37, target: "Наружные половые органы", category: "Грибы", source: "Нарушение местного иммунитета и кислотности кожи/слизистых, ношение синтетического белья." },
+            { name: "Aspergillus terreus", prob: 83, target: "Легочная ткань", category: "Грибы", source: "Споры черной плесени в воздухе сырых помещений, подвалов, старые кондиционеры." },
+            { name: "Mucor mucedo", prob: 74, target: "Трахея", category: "Грибы", source: "Плесень (белая). Споры вдыхаются с пылью, находятся на испорченных продуктах." },
+            { name: "Candida robista", prob: 89, target: "Уретра; Наружные половые органы", category: "Грибы", source: "Резкое снижение иммунитета, прием антибиотиков, нарушение гигиены или передача от партнера." },
+            { name: "Malassezia ovalis", prob: 65, target: "Кожа", category: "Грибы", source: "Постоянный житель кожи человека. Вызывает проблемы (перхоть, дерматит) при стрессе и изменениях сальных желез." },
+            { name: "Coccidioides immitis", prob: 95, target: "Легочная ткань", category: "Грибы", source: "Вдыхание пыли, содержащей споры (особенно в строительной пыли или земляных работах)." },
+            // Бактерии
+            { name: "Chryseobacterium gleumc", prob: 52, target: "Не указан", category: "Бактерии", source: "Вода, почва, иногда больничная среда. Редко вызывает проблемы у здоровых людей." },
+            { name: "Eubacterium brachy", prob: 51, target: "Трахея", category: "Бактерии", source: "Часть флоры полости рта. Может вызывать воспаление при попадании в дыхательные пути (микроаспирация)." },
+            { name: "Bacteroides melaninogenicus", prob: 79, target: "Трахея", category: "Бактерии", source: "Бактерия полости рта. Вызывает воспаление десен, может опускаться в трахею при сниженном иммунитете." },
+            { name: "Megasphaera", prob: 52, target: "Не указан", category: "Бактерии", source: "Нормальная флора кишечника, маркером дисбактериоза является изменение ее количества." },
+            { name: "Pseudomonas aeruginosa", prob: 55, target: "Желчный пузырь", category: "Бактерии", source: "(Синегнойная палочка) Вода, почва. Часто передается в быту через влажные предметы (мочалки, полотенца)." },
+            { name: "Streptococcus viridans", prob: 76, target: "Ротовая полость; Миндалины", category: "Бактерии", source: "Естественный обитатель ротовой полости. Становится агрессивным при кариесе и ангинах." },
+            { name: "Flavimonas oryzihabitans", prob: 66, target: "Трахея", category: "Бактерии", source: "Обитает во влажной среде, раковинах, губках. Попадает аэрозольно или через грязные руки." },
+            { name: "Eikenella corrodens", prob: 47, target: "Ротовая полость; Миндалины", category: "Бактерии", source: "Живет в зубном налете. Передается через слюну, плохую гигиену рта." },
+            { name: "Fusobacterium alocis", prob: 55, target: "Прямая кишка", category: "Бактерии", source: "Обитает в ротовой полости (при пародонтите) и кишечнике. Индикатор дисбиоза." },
+            { name: "Peptococcus prevotii", prob: 55, target: "Трахея; Тонкий кишечник", category: "Бактерии", source: "Нормальная флора слизистых. Патогенна только при попадании в другие органы или резком росте." },
+            // Вирусы
+            { name: "Human alphaherpesvirus 2", prob: 55, target: "Кожа лица", category: "Вирусы", source: "Контактный путь (вирус простого герпеса). После заражения остается в организме навсегда." },
+            { name: "Human alphaherpesvirus 1", prob: 84, target: "Кожа лица", category: "Вирусы", source: "Вирус герпеса 1 типа (простуда на губах). Передается через поцелуи, общую посуду в детстве." },
+            { name: "Human Papillomavirus", prob: 72, target: "Не указан", category: "Вирусы", source: "Вирус папилломы человека (ВПЧ). Контактно-бытовой, половой пути передачи. Очень распространен." },
+            { name: "Citomegalovirus hominis", prob: 74, target: "Миндалины; Носовые проходы", category: "Вирусы", source: "Цитомегаловирус (семейство герпесов). Воздушно-капельный, через слюну. Носителями является большинство взрослых." },
+            { name: "Human betaherpesvirus 7", prob: 80, target: "Вены нижних конечностей", category: "Вирусы", source: "Вирус герпеса 7 типа. Заражение в раннем детстве воздушно-капельным путем. Часто бессимптомен." },
+            { name: "Hepatitus B", prob: 55, target: "Печень", category: "Вирусы", source: "Через кровь, нестерильные медицинские/косметические инструменты (маникюр, тату), половой контакт." },
+            { name: "Hepatitus A", prob: 39, target: "Печень", category: "Вирусы", source: "Болезнь 'грязных рук'. Через зараженную воду, пищу (особенно морепродукты), лед в напитках." },
+            // Гельминты
+            { name: "Gongylonema pulchrum", prob: 55, target: "Ротовая полость", category: "Гельминты", source: "Случайное проглатывание зараженных насекомых (тараканы, жуки) или употребление загрязненной ими воды." },
+            { name: "Necator americanus", prob: 83, target: "Тонкий кишечник", category: "Гельминты", source: "Личинки проникают через кожу при хождении босиком по зараженной почве." },
+            { name: "Ancylostoma duodenale", prob: 57, target: "Тонкий кишечник; 12-перстная", category: "Гельминты", source: "Проникновение личинок через кожу (почва) или проглатывание с немытыми овощами/водой." },
+            { name: "Strongyloides stercoralis", prob: 80, target: "Тонкий; Толстый кишечник", category: "Гельминты", source: "Контакт обнаженной кожи с зараженной почвой (личинки проникают активно)." },
+            { name: "Enterobius vermicularis", prob: 93, target: "Прямая кишка", category: "Гельминты", source: "Острицы. Самый частый паразит. Грязные руки, пыль, постельное белье, бытовые предметы." },
+            { name: "Hymenolepis nana", prob: 72, target: "Тонкий; Толстый кишечник", category: "Гельминты", source: "Карликовый цепень. Немытые руки, загрязненная пища. Часто передается от человека к человеку." },
+            { name: "Rhabditis hominis", prob: 37, target: "Тонкий кишечник", category: "Гельминты", source: "Обычно живет в почве. Случайное попадание с очень грязными корнеплодами." },
+            { name: "Trychostrongylus colabriformis", prob: 80, target: "Тонкий кишечник", category: "Гельминты", source: "Заражение при употреблении грязных овощей, зелени, контактировавших с навозом травоядных." },
+            { name: "Taenia pisiformis", prob: 65, target: "Толстый кишечник", category: "Гельминты", source: "Обычно паразит собак/кошек. Человеку передается при случайном проглатывании блох или тесном контакте с животными." },
+            { name: "Taenia solium (яйца)", prob: 65, target: "Тонкий; Толстый кишечник", category: "Гельминты", source: "Свиной цепень. Яйца попадают через грязные руки или зараженную воду (в отличие от личинок, которые в недожаренном мясе)." }
+        ];
+
+        // Sort data descending by probability
+        rawData.sort((a, b) => b.prob - a.prob);
+
+        // State
+        let currentCategory = "Все";
+        const categories = ["Все", ...new Set(rawData.map(d => d.category))];
+
+        // Initialization
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('totalCount').innerText = rawData.length;
+            initChart();
+            renderTabs();
+            renderGrid(rawData);
+        });
+
+        // 1. Render Top Threats Chart (Top 10)
+        function initChart() {
+            const top10 = rawData.slice(0, 10);
+            const ctx = document.getElementById('topThreatsChart').getContext('2d');
+            
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: top10.map(d => d.name),
+                    datasets: [{
+                        label: 'Вероятность (%)',
+                        data: top10.map(d => d.prob),
+                        backgroundColor: top10.map(d => d.prob >= 80 ? 'rgba(239, 68, 68, 0.8)' : 'rgba(245, 158, 11, 0.8)'),
+                        borderColor: top10.map(d => d.prob >= 80 ? 'rgb(220, 38, 38)' : 'rgb(217, 119, 6)'),
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    indexAxis: 'y', // Horizontal bar chart
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const item = top10[context.dataIndex];
+                                    return `Вероятность: ${item.prob}% | Орган: ${item.target}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 100,
+                            title: { display: true, text: 'Процент вероятности (%)' }
+                        },
+                        y: {
+                            ticks: {
+                                callback: function(value, index, values) {
+                                    const label = this.getLabelForValue(value);
+                                    // Truncate long names for y-axis
+                                    return label.length > 16 ? label.substr(0, 16) + '...' : label;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 2. Render Tabs
+        function renderTabs() {
+            const container = document.getElementById('categoryTabs');
+            
+            const categoryIcons = {
+                "Все": "📋", "Простейшие": "🦠", "Грибы": "🍄", "Бактерии": "🧫", "Вирусы": "🧬", "Гельминты": "🐛"
+            };
+
+            categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = `tab-btn px-4 py-3 text-sm focus:outline-none transition-colors duration-200 ${cat === currentCategory ? 'active' : 'text-slate-500 hover:text-slate-800'}`;
+                btn.innerHTML = `${categoryIcons[cat] || ''} ${cat}`;
+                btn.onclick = () => {
+                    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active', 'border-b-2', 'border-blue-500', 'text-blue-600', 'font-semibold'));
+                    btn.classList.add('active', 'border-b-2', 'border-blue-500', 'text-blue-600', 'font-semibold');
+                    btn.classList.remove('text-slate-500');
+                    currentCategory = cat;
+                    filterData();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        // 3. Filter and Render Grid
+        function filterData() {
+            const filtered = currentCategory === "Все" ? rawData : rawData.filter(d => d.category === currentCategory);
+            renderGrid(filtered);
+        }
+
+        function getRiskClass(prob) {
+            if (prob >= 80) return "risk-high";
+            if (prob >= 50) return "risk-medium";
+            return "risk-low";
+        }
+
+        function renderGrid(data) {
+            const container = document.getElementById('pathogenGrid');
+            container.innerHTML = '';
+
+            if (data.length === 0) {
+                container.innerHTML = `<p class="text-slate-500 col-span-full text-center py-8">Нет данных для этой категории.</p>`;
+                return;
+            }
+
+            data.forEach((item, index) => {
+                const riskClass = getRiskClass(item.prob);
+                const card = document.createElement('div');
+                card.className = `p-4 rounded-lg shadow-sm flex flex-col justify-between ${riskClass} transition-transform hover:-translate-y-1`;
+                
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-start mb-2">
+                            <h3 class="font-bold text-lg leading-tight pr-2">${item.name}</h3>
+                            <span class="font-black text-xl">${item.prob}%</span>
+                        </div>
+                        <div class="text-xs uppercase tracking-wider opacity-70 mb-3 font-semibold">${item.category}</div>
+                        
+                        <div class="mb-3">
+                            <span class="text-xs font-semibold opacity-80 block mb-1">🎯 Орган-мишень:</span>
+                            <span class="text-sm font-medium bg-white/50 px-2 py-1 rounded inline-block">${item.target}</span>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-4 pt-3 border-t border-black/10">
+                        <span class="text-xs font-semibold opacity-80 block mb-1">🔍 Откуда мог появиться?</span>
+                        <p class="text-xs leading-relaxed">${item.source}</p>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+    </script>
+</body>
+</html>
