@@ -1,0 +1,4 @@
+[
+  {"name":"Test pathogen A","prob":20,"target":"Кишечник","category":"Тест","source":"Тестовый источник"},
+  {"name":"Test pathogen B","prob":80,"target":"Печень","category":"Тест","source":"Тестовый источник"}
+]
