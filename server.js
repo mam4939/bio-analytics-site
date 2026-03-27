@@ -6,7 +6,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 app.use(bodyParser.json());
-app.use(express.static('public'));
+app.use(express.static(__dirname));
+
+// Обслуживаем index.html по умолчанию
+app.get('*', (req, res) => {
+  res.sendFile(__dirname + '/index.html');
+});
 
 const openaiKey = process.env.OPENAI_API_KEY;
 const geminiKey = process.env.GEMINI_API_KEY;
